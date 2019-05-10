@@ -10,121 +10,125 @@
 #include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
 
-ObjectCache::ObjectCache(std::string Dir)
-    : Enabled(!Dir.empty()), CacheDir(endWithSeparator(std::move(Dir))) {
-  if (!llvm::sys::fs::exists(CacheDir)) {
+ObjectCache::ObjectCache(std::string dir)
+    : enabled(!dir.empty()), cache_dir(EndWithSeparator(std::move(dir))) {
+  if (!llvm::sys::fs::exists(cache_dir)) {
     LLVM_DEBUG(llvm::dbgs() << format("Create new cache directory '%s'\n\n",
-                                      CacheDir.c_str()));
-    std::error_code EC = llvm::sys::fs::create_directories(CacheDir);
-    if (EC) {
+                                      cache_dir.c_str()));
+    std::error_code error_code = llvm::sys::fs::create_directories(cache_dir);
+    if (error_code) {
       LLVM_DEBUG(llvm::dbgs()
                  << format("Creating new cache directory '%s' failed with "
                            "error code %d; Caching disabled\n\n",
-                           CacheDir.c_str(), EC.value()));
-      Enabled = false;
+                           cache_dir.c_str(), error_code.value()));
+      enabled = false;
     }
   }
 }
 
-std::string ObjectCache::endWithSeparator(std::string Path) {
-  return Path.back() == '/' ? Path : Path + "/";
+std::string ObjectCache::EndWithSeparator(std::string path) {
+  return path.back() == '/' ? path : path + "/";
 }
 
 // Implements llvm::ObjectCache::notifyObjectCompiled, called from CompileLayer
-void ObjectCache::notifyObjectCompiled(const llvm::Module *M,
-                                       llvm::MemoryBufferRef Obj) {
-  assert(M && "Caching requires module");
+void ObjectCache::notifyObjectCompiled(const llvm::Module *module,
+                                       llvm::MemoryBufferRef obj) {
+  assert(module && "Caching requires module");
 
-  auto R = getCacheFileName(M->getModuleIdentifier());
-  if (!R.hasValue()) {
+  auto file_name = GetCacheFileName(module->getModuleIdentifier());
+  if (!file_name.hasValue()) {
     return;
   }
 
-  std::string F = std::move(R.getValue());
-  if (auto EC =
-          llvm::sys::fs::create_directories(llvm::sys::path::parent_path(F))) {
+  std::string file = std::move(file_name.getValue());
+  if (auto error_code = llvm::sys::fs::create_directories(
+          llvm::sys::path::parent_path(file))) {
     LLVM_DEBUG(llvm::dbgs() << format(
                    "Writing cached object '%s' failed with error code %d\n\n",
-                   F.c_str(), EC.value()));
+                   file.c_str(), error_code.value()));
     return;
   }
 
-  std::error_code EC;
-  llvm::raw_fd_ostream OS(F, EC, llvm::sys::fs::F_None);
-  if (EC) {
+  std::error_code error_code;
+  llvm::raw_fd_ostream os(file, error_code, llvm::sys::fs::F_None);
+  if (error_code) {
     LLVM_DEBUG(llvm::dbgs() << format(
                    "Writing cached object '%s' failed with error code %d\n\n",
-                   F.c_str(), EC.value()));
+                   file.c_str(), error_code.value()));
     return;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << format("Write cached object '%s'\n\n", F.c_str()));
+  LLVM_DEBUG(
+      llvm::dbgs() << format("Write cached object '%s'\n\n", file.c_str()));
 
-  OS.write(Obj.getBufferStart(), Obj.getBufferSize());
-  OS.close();
+  os.write(obj.getBufferStart(), obj.getBufferSize());
+  os.close();
 }
 
 // Implements llvm::ObjectCache::getObject, called from CompileLayer
 std::unique_ptr<llvm::MemoryBuffer>
-ObjectCache::getObject(const llvm::Module *M) {
-  assert(M && "Lookup requires module");
+ObjectCache::getObject(const llvm::Module *module) {
+  assert(module && "Lookup requires module");
 
-  auto R = getCachedObject(*M);
-  if (!R) {
-    logAllUnhandledErrors(R.takeError(), llvm::dbgs(), "ObjectCache: ");
+  auto obj = GetCachedObject(*module);
+  if (!obj) {
+    logAllUnhandledErrors(obj.takeError(), llvm::dbgs(), "ObjectCache: ");
     return nullptr; // Error
   }
 
-  if (!R->hasValue()) {
+  if (!obj->hasValue()) {
     return nullptr; // No cache entry
   }
 
-  return std::forward<std::unique_ptr<llvm::MemoryBuffer>>(R->getValue());
+  return std::forward<std::unique_ptr<llvm::MemoryBuffer>>(obj->getValue());
 }
 
 llvm::Expected<llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>>
-ObjectCache::getCachedObject(const llvm::Module &M) const {
-  auto R = getCacheFileName(M.getModuleIdentifier());
-  if (!R.hasValue()) {
+ObjectCache::GetCachedObject(const llvm::Module &module) const {
+  auto file_name = GetCacheFileName(module.getModuleIdentifier());
+  if (!file_name.hasValue()) {
     return llvm::None;
   }
 
-  std::string F = std::move(R.getValue());
-  if (!llvm::sys::fs::exists(F)) {
+  std::string file = std::move(file_name.getValue());
+  if (!llvm::sys::fs::exists(file)) {
     return llvm::None;
   }
 
-  auto B = llvm::MemoryBuffer::getFile(F, -1, false);
-  if (!B)
+  auto buf = llvm::MemoryBuffer::getFile(file, -1, false);
+  if (!buf)
     return llvm::createStringError(
-        B.getError(),
-        "Reading cached object '%s' failed with error code %d\n\n", F.c_str(),
-        B.getError().value());
+        buf.getError(),
+        "Reading cached object '%s' failed with error code %d\n\n",
+        file.c_str(), buf.getError().value());
 
-  LLVM_DEBUG(llvm::dbgs() << format("Read cached object '%s'\n\n", F.c_str()));
-  return std::forward<std::unique_ptr<llvm::MemoryBuffer>>(*B);
+  LLVM_DEBUG(
+      llvm::dbgs() << format("Read cached object '%s'\n\n", file.c_str()));
+  return std::forward<std::unique_ptr<llvm::MemoryBuffer>>(*buf);
 }
 
-void ObjectCache::setCacheModuleName(llvm::Module &M) const {
-  if (Enabled && !M.getName().startswith("file:"))
-    M.setModuleIdentifier("file:" + M.getModuleIdentifier() + ".o");
+void ObjectCache::SetCacheModuleName(llvm::Module &module) const {
+  if (enabled && !module.getName().startswith("file:")) {
+    module.setModuleIdentifier("file:" + module.getModuleIdentifier() + ".o");
+  }
 }
 
 llvm::Optional<std::string>
-ObjectCache::getCacheFileName(llvm::StringRef ModID) const {
-  if (!Enabled) {
+ObjectCache::GetCacheFileName(llvm::StringRef module_id) const {
+  if (!enabled) {
     return llvm::None;
   }
 
-  llvm::StringRef Prefix = "file:";
-  if (!ModID.startswith(Prefix)) {
+  llvm::StringRef prefix = "file:";
+  if (!module_id.startswith(prefix)) {
     return llvm::None;
   }
 
-  std::string Name = llvm::Twine(CacheDir + ModID.substr(Prefix.size())).str();
-  size_t DotPos = Name.rfind('.');
-  if (DotPos != std::string::npos)
-    Name.replace(DotPos, Name.size() - DotPos, ".o");
-
-  return Name;
+  std::string name =
+      llvm::Twine(cache_dir + module_id.substr(prefix.size())).str();
+  size_t dot_pos = name.rfind('.');
+  if (dot_pos != std::string::npos) {
+    name.replace(dot_pos, name.size() - dot_pos, ".o");
+  }
+  return name;
 }

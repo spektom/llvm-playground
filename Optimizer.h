@@ -8,14 +8,16 @@
 
 class Optimizer {
 public:
-  Optimizer(unsigned OptLevel) { B.OptLevel = OptLevel; }
+  Optimizer(unsigned optimization_level) {
+    builder.OptLevel = optimization_level;
+  }
 
   llvm::Expected<llvm::orc::ThreadSafeModule>
-  operator()(llvm::orc::ThreadSafeModule TSM,
+  operator()(llvm::orc::ThreadSafeModule module,
              const llvm::orc::MaterializationResponsibility &);
 
 private:
-  llvm::PassManagerBuilder B;
+  llvm::PassManagerBuilder builder;
 };
 
 #endif /* OPTIMIZER_H_ */

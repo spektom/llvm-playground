@@ -24,8 +24,8 @@
 
 class Jit {
 public:
-  Jit(std::unique_ptr<llvm::TargetMachine> TM,
-      const std::string &CacheDir = "");
+  Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
+      const std::string &cache_dir = "");
 
   // Not a value type.
   Jit(const Jit &) = delete;
@@ -33,42 +33,43 @@ public:
   Jit(Jit &&) = delete;
   Jit &operator=(Jit &&) = delete;
 
-  llvm::Error submitModule(std::unique_ptr<llvm::Module> M,
-                           std::unique_ptr<llvm::LLVMContext> C,
-                           unsigned OptLevel, bool AddToCache);
+  llvm::Error SubmitModule(std::unique_ptr<llvm::Module> module,
+                           std::unique_ptr<llvm::LLVMContext> context,
+                           unsigned optimization_level, bool add_to_cache);
 
   template <class Signature_t>
-  llvm::Expected<std::function<Signature_t>> getFunction(llvm::StringRef Name) {
-    if (auto A = getFunctionAddr(Name))
+  llvm::Expected<std::function<Signature_t>> GetFunction(llvm::StringRef name) {
+    if (auto addr = GetFunctionAddr(name)) {
       return std::function<Signature_t>(
-          llvm::jitTargetAddressToPointer<Signature_t *>(*A));
-    else
-      return A.takeError();
+          llvm::jitTargetAddressToPointer<Signature_t *>(*addr));
+    } else {
+      return addr.takeError();
+    }
   }
 
 private:
-  std::unique_ptr<llvm::orc::ExecutionSession> ES;
-  std::unique_ptr<llvm::TargetMachine> TM;
+  std::unique_ptr<llvm::orc::ExecutionSession> exec_session;
+  std::unique_ptr<llvm::TargetMachine> target_machine;
 
-  std::unique_ptr<ObjectCache> ObjCache;
-  llvm::JITEventListener *GDBListener;
+  std::unique_ptr<ObjectCache> obj_cache;
+  llvm::JITEventListener *gdb_listener;
 
-  llvm::orc::RTDyldObjectLinkingLayer ObjLinkingLayer;
-  llvm::orc::IRCompileLayer CompileLayer;
-  llvm::orc::IRTransformLayer OptimizeLayer;
+  llvm::orc::RTDyldObjectLinkingLayer linking_layer;
+  llvm::orc::IRCompileLayer compile_layer;
+  llvm::orc::IRTransformLayer optimize_layer;
 
-  llvm::orc::JITDylib::GeneratorFunction createHostProcessResolver();
+  llvm::orc::JITDylib::GeneratorFunction CreateHostProcessResolver();
 
   llvm::orc::RTDyldObjectLinkingLayer::GetMemoryManagerFunction
-  createMemoryManagerFtor();
+  CreateMemoryManagerFtor();
 
   llvm::orc::RTDyldObjectLinkingLayer::NotifyLoadedFunction
-  createNotifyLoadedFtor();
+  CreateNotifyLoadedFtor();
 
-  std::string mangle(llvm::StringRef UnmangledName);
-  llvm::Error applyDataLayout(llvm::Module &M);
+  std::string Mangle(llvm::StringRef unmangled_name);
+  llvm::Error ApplyDataLayout(llvm::Module &module);
 
-  llvm::Expected<llvm::JITTargetAddress> getFunctionAddr(llvm::StringRef Name);
+  llvm::Expected<llvm::JITTargetAddress> GetFunctionAddr(llvm::StringRef name);
 };
 
 #endif /* JIT_H_ */

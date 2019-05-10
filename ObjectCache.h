@@ -11,13 +11,13 @@
 // Simple name-based lookup, based on lli's implementation
 class ObjectCache : public llvm::ObjectCache {
 public:
-  ObjectCache(std::string Dir);
+  ObjectCache(std::string dir);
   ~ObjectCache() = default;
 
-  void setCacheModuleName(llvm::Module &M) const;
+  void SetCacheModuleName(llvm::Module &module) const;
 
   llvm::Expected<llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>>
-  getCachedObject(const llvm::Module &M) const;
+  GetCachedObject(const llvm::Module &module) const;
 
 protected:
   std::unique_ptr<llvm::MemoryBuffer> getObject(const llvm::Module *M) override;
@@ -25,11 +25,11 @@ protected:
                             llvm::MemoryBufferRef Obj) override;
 
 private:
-  bool Enabled;
-  std::string CacheDir;
+  bool enabled;
+  std::string cache_dir;
 
-  static std::string endWithSeparator(std::string Path);
-  llvm::Optional<std::string> getCacheFileName(llvm::StringRef ModID) const;
+  static std::string EndWithSeparator(std::string path);
+  llvm::Optional<std::string> GetCacheFileName(llvm::StringRef module_id) const;
 };
 
 #endif /* OBJECT_CACHE_H_ */

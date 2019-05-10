@@ -5,24 +5,24 @@
 #include <llvm/Support/raw_ostream.h>
 
 llvm::Expected<llvm::orc::ThreadSafeModule> Optimizer::
-operator()(llvm::orc::ThreadSafeModule TSM,
+operator()(llvm::orc::ThreadSafeModule thread_safe_module,
            const llvm::orc::MaterializationResponsibility &) {
-  llvm::Module &M = *TSM.getModule();
+  llvm::Module &module = *thread_safe_module.getModule();
 
-  llvm::legacy::FunctionPassManager FPM(&M);
-  B.populateFunctionPassManager(FPM);
+  llvm::legacy::FunctionPassManager func_pass_manager(&module);
+  builder.populateFunctionPassManager(func_pass_manager);
 
-  FPM.doInitialization();
-  for (llvm::Function &F : M) {
-    FPM.run(F);
+  func_pass_manager.doInitialization();
+  for (llvm::Function &function : module) {
+    func_pass_manager.run(function);
   }
-  FPM.doFinalization();
+  func_pass_manager.doFinalization();
 
-  llvm::legacy::PassManager MPM;
-  B.populateModulePassManager(MPM);
-  MPM.run(M);
+  llvm::legacy::PassManager module_pass_manager;
+  builder.populateModulePassManager(module_pass_manager);
+  module_pass_manager.run(module);
 
-  LLVM_DEBUG(dbgs() << "Optimized IR module:\n\n" << M << "\n\n");
+  LLVM_DEBUG(dbgs() << "Optimized IR module:\n\n" << module << "\n\n");
 
-  return std::move(TSM);
+  return std::move(thread_safe_module);
 }

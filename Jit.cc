@@ -10,71 +10,78 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
-Jit::Jit(std::unique_ptr<llvm::TargetMachine> TM, const std::string &CacheDir)
-    : ES(std::make_unique<llvm::orc::ExecutionSession>()), TM(std::move(TM)),
-      ObjCache(std::make_unique<ObjectCache>(CacheDir)),
-      GDBListener(llvm::JITEventListener::createGDBRegistrationListener()),
-      ObjLinkingLayer(*ES, createMemoryManagerFtor(), createNotifyLoadedFtor()),
-      CompileLayer(*ES, ObjLinkingLayer,
-                   llvm::orc::SimpleCompiler(*this->TM, ObjCache.get())),
-      OptimizeLayer(*ES, CompileLayer) {
-  if (auto R = createHostProcessResolver())
-    ES->getMainJITDylib().setGenerator(std::move(R));
+Jit::Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
+         const std::string &cache_dir)
+    : exec_session(std::make_unique<llvm::orc::ExecutionSession>()),
+      target_machine(std::move(target_machine)),
+      obj_cache(std::make_unique<ObjectCache>(cache_dir)),
+      gdb_listener(llvm::JITEventListener::createGDBRegistrationListener()),
+      linking_layer(*exec_session, CreateMemoryManagerFtor(),
+                    CreateNotifyLoadedFtor()),
+      compile_layer(
+          *exec_session, linking_layer,
+          llvm::orc::SimpleCompiler(*this->target_machine, obj_cache.get())),
+      optimize_layer(*exec_session, compile_layer) {
+  if (auto resolver = CreateHostProcessResolver()) {
+    exec_session->getMainJITDylib().setGenerator(std::move(resolver));
+  }
 }
 
-llvm::orc::JITDylib::GeneratorFunction Jit::createHostProcessResolver() {
-  llvm::DataLayout DL = TM->createDataLayout();
-  llvm::Expected<llvm::orc::JITDylib::GeneratorFunction> R =
-      llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(DL);
+llvm::orc::JITDylib::GeneratorFunction Jit::CreateHostProcessResolver() {
+  llvm::DataLayout data_layout = target_machine->createDataLayout();
+  llvm::Expected<llvm::orc::JITDylib::GeneratorFunction> resolver =
+      llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+          data_layout);
 
-  if (!R) {
-    ES->reportError(R.takeError());
+  if (!resolver) {
+    exec_session->reportError(resolver.takeError());
     return nullptr;
   }
 
-  if (!*R) {
-    ES->reportError(llvm::createStringError(
+  if (!*resolver) {
+    exec_session->reportError(llvm::createStringError(
         llvm::inconvertibleErrorCode(),
         "Generator function for host process symbols must not be null"));
     return nullptr;
   }
 
-  return *R;
+  return *resolver;
 }
 
 using GetMemoryManagerFunction =
     llvm::orc::RTDyldObjectLinkingLayer::GetMemoryManagerFunction;
 
-GetMemoryManagerFunction Jit::createMemoryManagerFtor() {
+GetMemoryManagerFunction Jit::CreateMemoryManagerFtor() {
   return []() -> GetMemoryManagerFunction::result_type {
     return std::make_unique<llvm::SectionMemoryManager>();
   };
 }
 
 llvm::orc::RTDyldObjectLinkingLayer::NotifyLoadedFunction
-Jit::createNotifyLoadedFtor() {
-  using namespace std::placeholders;
-  return std::bind(&llvm::JITEventListener::notifyObjectLoaded, GDBListener, _1,
-                   _2, _3);
+Jit::CreateNotifyLoadedFtor() {
+  return std::bind(&llvm::JITEventListener::notifyObjectLoaded, gdb_listener,
+                   std::placeholders::_1, std::placeholders::_2,
+                   std::placeholders::_3);
 }
 
-std::string Jit::mangle(llvm::StringRef UnmangledName) {
-  std::string MangledName;
+std::string Jit::Mangle(llvm::StringRef unmangled_name) {
+  std::string mangled_name;
   {
-    llvm::DataLayout DL = TM->createDataLayout();
-    llvm::raw_string_ostream MangledNameStream(MangledName);
-    llvm::Mangler::getNameWithPrefix(MangledNameStream, UnmangledName, DL);
+    llvm::DataLayout data_layout = target_machine->createDataLayout();
+    llvm::raw_string_ostream mangled_name_stream(mangled_name);
+    llvm::Mangler::getNameWithPrefix(mangled_name_stream, unmangled_name,
+                                     data_layout);
   }
-  return MangledName;
+  return mangled_name;
 }
 
-llvm::Error Jit::applyDataLayout(llvm::Module &M) {
-  llvm::DataLayout DL = TM->createDataLayout();
-  if (M.getDataLayout().isDefault()) {
-    M.setDataLayout(DL);
+llvm::Error Jit::ApplyDataLayout(llvm::Module &module) {
+  llvm::DataLayout data_layout = target_machine->createDataLayout();
+  if (module.getDataLayout().isDefault()) {
+    module.setDataLayout(data_layout);
   }
 
-  if (M.getDataLayout() != DL) {
+  if (module.getDataLayout() != data_layout) {
     return llvm::make_error<llvm::StringError>(
         "Added modules have incompatible data layouts",
         llvm::inconvertibleErrorCode());
@@ -83,51 +90,55 @@ llvm::Error Jit::applyDataLayout(llvm::Module &M) {
   return llvm::Error::success();
 }
 
-llvm::Error Jit::submitModule(std::unique_ptr<llvm::Module> M,
-                              std::unique_ptr<llvm::LLVMContext> C,
-                              unsigned OptLevel, bool AddToCache) {
-  if (AddToCache)
-    ObjCache->setCacheModuleName(*M);
-
-  auto Obj = ObjCache->getCachedObject(*M);
-  if (!Obj) {
-    M.~unique_ptr();
-    return Obj.takeError();
+llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
+                              std::unique_ptr<llvm::LLVMContext> context,
+                              unsigned optimization_level, bool add_to_cache) {
+  if (add_to_cache) {
+    obj_cache->SetCacheModuleName(*module);
   }
 
-  if (Obj->hasValue()) {
-    M.~unique_ptr();
-    return ObjLinkingLayer.add(ES->getMainJITDylib(),
-                               std::move(Obj->getValue()));
+  auto obj = obj_cache->GetCachedObject(*module);
+  if (!obj) {
+    module.~unique_ptr();
+    return obj.takeError();
+  }
+
+  if (obj->hasValue()) {
+    module.~unique_ptr();
+    return linking_layer.add(exec_session->getMainJITDylib(),
+                             std::move(obj->getValue()));
   }
 
   LLVM_DEBUG(dbgs() << "Submit IR module:\n\n" << *M << "\n\n");
 
-  if (auto Err = applyDataLayout(*M)) {
-    return Err;
+  if (auto err = ApplyDataLayout(*module)) {
+    return err;
   }
 
-  OptimizeLayer.setTransform(Optimizer(OptLevel));
+  optimize_layer.setTransform(Optimizer(optimization_level));
 
-  return OptimizeLayer.add(
-      ES->getMainJITDylib(),
-      llvm::orc::ThreadSafeModule(std::move(M), std::move(C)),
-      ES->allocateVModule());
+  return optimize_layer.add(
+      exec_session->getMainJITDylib(),
+      llvm::orc::ThreadSafeModule(std::move(module), std::move(context)),
+      exec_session->allocateVModule());
 }
 
 llvm::Expected<llvm::JITTargetAddress>
-Jit::getFunctionAddr(llvm::StringRef Name) {
-  llvm::orc::SymbolStringPtr NamePtr = ES->intern(mangle(Name));
-  llvm::orc::JITDylibSearchList JDs{{&ES->getMainJITDylib(), true}};
+Jit::GetFunctionAddr(llvm::StringRef name) {
+  llvm::orc::SymbolStringPtr name_ptr = exec_session->intern(Mangle(name));
+  llvm::orc::JITDylibSearchList JDs{{&exec_session->getMainJITDylib(), true}};
 
-  llvm::Expected<llvm::JITEvaluatedSymbol> S = ES->lookup(JDs, NamePtr);
-  if (!S)
-    return S.takeError();
+  llvm::Expected<llvm::JITEvaluatedSymbol> symbol =
+      exec_session->lookup(JDs, name_ptr);
+  if (!symbol) {
+    return symbol.takeError();
+  }
 
-  llvm::JITTargetAddress A = S->getAddress();
-  if (!A)
+  llvm::JITTargetAddress addr = symbol->getAddress();
+  if (!addr) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "'%s' evaluated to nullptr", Name.data());
+                                   "'%s' evaluated to nullptr", name.data());
+  }
 
-  return A;
+  return addr;
 }
