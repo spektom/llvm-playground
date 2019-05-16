@@ -1,5 +1,3 @@
-#include "ObjectCache.h"
-
 #include <llvm/ADT/None.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/Twine.h>
@@ -10,18 +8,20 @@
 #include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "object_cache.h"
+
 ObjectCache::ObjectCache(std::string dir)
-    : enabled(!dir.empty()), cache_dir(EndWithSeparator(std::move(dir))) {
-  if (!llvm::sys::fs::exists(cache_dir)) {
+    : enabled_(!dir.empty()), cache_dir_(EndWithSeparator(std::move(dir))) {
+  if (!llvm::sys::fs::exists(cache_dir_)) {
     LLVM_DEBUG(llvm::dbgs() << format("Create new cache directory '%s'\n\n",
-                                      cache_dir.c_str()));
-    std::error_code error_code = llvm::sys::fs::create_directories(cache_dir);
+                                      cache_dir_.c_str()));
+    std::error_code error_code = llvm::sys::fs::create_directories(cache_dir_);
     if (error_code) {
       LLVM_DEBUG(llvm::dbgs()
                  << format("Creating new cache directory '%s' failed with "
                            "error code %d; Caching disabled\n\n",
-                           cache_dir.c_str(), error_code.value()));
-      enabled = false;
+                           cache_dir_.c_str(), error_code.value()));
+      enabled_ = false;
     }
   }
 }
@@ -108,14 +108,14 @@ ObjectCache::GetCachedObject(const llvm::Module &module) const {
 }
 
 void ObjectCache::SetCacheModuleName(llvm::Module &module) const {
-  if (enabled && !module.getName().startswith("file:")) {
+  if (enabled_ && !module.getName().startswith("file:")) {
     module.setModuleIdentifier("file:" + module.getModuleIdentifier() + ".o");
   }
 }
 
 llvm::Optional<std::string>
 ObjectCache::GetCacheFileName(llvm::StringRef module_id) const {
-  if (!enabled) {
+  if (!enabled_) {
     return llvm::None;
   }
 
@@ -125,7 +125,7 @@ ObjectCache::GetCacheFileName(llvm::StringRef module_id) const {
   }
 
   std::string name =
-      llvm::Twine(cache_dir + module_id.substr(prefix.size())).str();
+      llvm::Twine(cache_dir_ + module_id.substr(prefix.size())).str();
   size_t dot_pos = name.rfind('.');
   if (dot_pos != std::string::npos) {
     name.replace(dot_pos, name.size() - dot_pos, ".o");

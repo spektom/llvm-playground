@@ -6,10 +6,12 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
+#include "optimization_level.h"
+
 class Optimizer {
 public:
-  Optimizer(unsigned optimization_level) {
-    builder.OptLevel = optimization_level;
+  Optimizer(OptimizationLevel optimization_level) {
+    builder_.OptLevel = static_cast<int>(optimization_level);
   }
 
   llvm::Expected<llvm::orc::ThreadSafeModule>
@@ -17,7 +19,7 @@ public:
              const llvm::orc::MaterializationResponsibility &);
 
 private:
-  llvm::PassManagerBuilder builder;
+  llvm::PassManagerBuilder builder_;
 };
 
 #endif /* OPTIMIZER_H_ */

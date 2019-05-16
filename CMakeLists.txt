@@ -61,10 +61,11 @@ endif()
 
 add_executable(${CMAKE_PROJECT_NAME}
   main.cc
-  Jit.cc
-  Codegen.cc
-  Optimizer.cc
-  ObjectCache.cc
+  jit.cc
+  codegen.cc
+  optimizer.cc
+  object_cache.cc
+  code_context.cc
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE

@@ -25,8 +25,8 @@ protected:
                             llvm::MemoryBufferRef Obj) override;
 
 private:
-  bool enabled;
-  std::string cache_dir;
+  bool enabled_;
+  std::string cache_dir_;
 
   static std::string EndWithSeparator(std::string path);
   llvm::Optional<std::string> GetCacheFileName(llvm::StringRef module_id) const;

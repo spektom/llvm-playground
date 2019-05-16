@@ -20,7 +20,8 @@
 #include <memory>
 #include <string>
 
-#include "ObjectCache.h"
+#include "object_cache.h"
+#include "optimization_level.h"
 
 class Jit {
 public:
@@ -35,7 +36,8 @@ public:
 
   llvm::Error SubmitModule(std::unique_ptr<llvm::Module> module,
                            std::unique_ptr<llvm::LLVMContext> context,
-                           unsigned optimization_level, bool add_to_cache);
+                           OptimizationLevel optimization_level,
+                           bool add_to_cache);
 
   template <class Signature_t>
   llvm::Expected<std::function<Signature_t>> GetFunction(llvm::StringRef name) {
@@ -48,15 +50,15 @@ public:
   }
 
 private:
-  std::unique_ptr<llvm::orc::ExecutionSession> exec_session;
-  std::unique_ptr<llvm::TargetMachine> target_machine;
+  std::unique_ptr<llvm::orc::ExecutionSession> exec_session_;
+  std::unique_ptr<llvm::TargetMachine> target_machine_;
 
-  std::unique_ptr<ObjectCache> obj_cache;
-  llvm::JITEventListener *gdb_listener;
+  std::unique_ptr<ObjectCache> obj_cache_;
+  llvm::JITEventListener *gdb_listener_;
 
-  llvm::orc::RTDyldObjectLinkingLayer linking_layer;
-  llvm::orc::IRCompileLayer compile_layer;
-  llvm::orc::IRTransformLayer optimize_layer;
+  llvm::orc::RTDyldObjectLinkingLayer linking_layer_;
+  llvm::orc::IRCompileLayer compile_layer_;
+  llvm::orc::IRTransformLayer optimize_layer_;
 
   llvm::orc::JITDylib::GeneratorFunction CreateHostProcessResolver();
 

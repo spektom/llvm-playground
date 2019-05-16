@@ -1,6 +1,3 @@
-#include "Jit.h"
-#include "Optimizer.h"
-
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
@@ -10,36 +7,39 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
+#include "jit.h"
+#include "optimizer.h"
+
 Jit::Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
          const std::string &cache_dir)
-    : exec_session(std::make_unique<llvm::orc::ExecutionSession>()),
-      target_machine(std::move(target_machine)),
-      obj_cache(std::make_unique<ObjectCache>(cache_dir)),
-      gdb_listener(llvm::JITEventListener::createGDBRegistrationListener()),
-      linking_layer(*exec_session, CreateMemoryManagerFtor(),
-                    CreateNotifyLoadedFtor()),
-      compile_layer(
-          *exec_session, linking_layer,
-          llvm::orc::SimpleCompiler(*this->target_machine, obj_cache.get())),
-      optimize_layer(*exec_session, compile_layer) {
+    : exec_session_(std::make_unique<llvm::orc::ExecutionSession>()),
+      target_machine_(std::move(target_machine)),
+      obj_cache_(std::make_unique<ObjectCache>(cache_dir)),
+      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()),
+      linking_layer_(*exec_session_, CreateMemoryManagerFtor(),
+                     CreateNotifyLoadedFtor()),
+      compile_layer_(
+          *exec_session_, linking_layer_,
+          llvm::orc::SimpleCompiler(*this->target_machine_, obj_cache_.get())),
+      optimize_layer_(*exec_session_, compile_layer_) {
   if (auto resolver = CreateHostProcessResolver()) {
-    exec_session->getMainJITDylib().setGenerator(std::move(resolver));
+    exec_session_->getMainJITDylib().setGenerator(std::move(resolver));
   }
 }
 
 llvm::orc::JITDylib::GeneratorFunction Jit::CreateHostProcessResolver() {
-  llvm::DataLayout data_layout = target_machine->createDataLayout();
+  llvm::DataLayout data_layout = target_machine_->createDataLayout();
   llvm::Expected<llvm::orc::JITDylib::GeneratorFunction> resolver =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           data_layout);
 
   if (!resolver) {
-    exec_session->reportError(resolver.takeError());
+    exec_session_->reportError(resolver.takeError());
     return nullptr;
   }
 
   if (!*resolver) {
-    exec_session->reportError(llvm::createStringError(
+    exec_session_->reportError(llvm::createStringError(
         llvm::inconvertibleErrorCode(),
         "Generator function for host process symbols must not be null"));
     return nullptr;
@@ -59,7 +59,7 @@ GetMemoryManagerFunction Jit::CreateMemoryManagerFtor() {
 
 llvm::orc::RTDyldObjectLinkingLayer::NotifyLoadedFunction
 Jit::CreateNotifyLoadedFtor() {
-  return std::bind(&llvm::JITEventListener::notifyObjectLoaded, gdb_listener,
+  return std::bind(&llvm::JITEventListener::notifyObjectLoaded, gdb_listener_,
                    std::placeholders::_1, std::placeholders::_2,
                    std::placeholders::_3);
 }
@@ -67,7 +67,7 @@ Jit::CreateNotifyLoadedFtor() {
 std::string Jit::Mangle(llvm::StringRef unmangled_name) {
   std::string mangled_name;
   {
-    llvm::DataLayout data_layout = target_machine->createDataLayout();
+    llvm::DataLayout data_layout = target_machine_->createDataLayout();
     llvm::raw_string_ostream mangled_name_stream(mangled_name);
     llvm::Mangler::getNameWithPrefix(mangled_name_stream, unmangled_name,
                                      data_layout);
@@ -76,7 +76,7 @@ std::string Jit::Mangle(llvm::StringRef unmangled_name) {
 }
 
 llvm::Error Jit::ApplyDataLayout(llvm::Module &module) {
-  llvm::DataLayout data_layout = target_machine->createDataLayout();
+  llvm::DataLayout data_layout = target_machine_->createDataLayout();
   if (module.getDataLayout().isDefault()) {
     module.setDataLayout(data_layout);
   }
@@ -92,12 +92,13 @@ llvm::Error Jit::ApplyDataLayout(llvm::Module &module) {
 
 llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
                               std::unique_ptr<llvm::LLVMContext> context,
-                              unsigned optimization_level, bool add_to_cache) {
+                              OptimizationLevel optimization_level,
+                              bool add_to_cache) {
   if (add_to_cache) {
-    obj_cache->SetCacheModuleName(*module);
+    obj_cache_->SetCacheModuleName(*module);
   }
 
-  auto obj = obj_cache->GetCachedObject(*module);
+  auto obj = obj_cache_->GetCachedObject(*module);
   if (!obj) {
     module.~unique_ptr();
     return obj.takeError();
@@ -105,8 +106,8 @@ llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
 
   if (obj->hasValue()) {
     module.~unique_ptr();
-    return linking_layer.add(exec_session->getMainJITDylib(),
-                             std::move(obj->getValue()));
+    return linking_layer_.add(exec_session_->getMainJITDylib(),
+                              std::move(obj->getValue()));
   }
 
   LLVM_DEBUG(dbgs() << "Submit IR module:\n\n" << *M << "\n\n");
@@ -115,21 +116,21 @@ llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
     return err;
   }
 
-  optimize_layer.setTransform(Optimizer(optimization_level));
+  optimize_layer_.setTransform(Optimizer(optimization_level));
 
-  return optimize_layer.add(
-      exec_session->getMainJITDylib(),
+  return optimize_layer_.add(
+      exec_session_->getMainJITDylib(),
       llvm::orc::ThreadSafeModule(std::move(module), std::move(context)),
-      exec_session->allocateVModule());
+      exec_session_->allocateVModule());
 }
 
 llvm::Expected<llvm::JITTargetAddress>
 Jit::GetFunctionAddr(llvm::StringRef name) {
-  llvm::orc::SymbolStringPtr name_ptr = exec_session->intern(Mangle(name));
-  llvm::orc::JITDylibSearchList JDs{{&exec_session->getMainJITDylib(), true}};
+  llvm::orc::SymbolStringPtr name_ptr = exec_session_->intern(Mangle(name));
+  llvm::orc::JITDylibSearchList JDs{{&exec_session_->getMainJITDylib(), true}};
 
   llvm::Expected<llvm::JITEvaluatedSymbol> symbol =
-      exec_session->lookup(JDs, name_ptr);
+      exec_session_->lookup(JDs, name_ptr);
   if (!symbol) {
     return symbol.takeError();
   }
