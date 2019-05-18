@@ -5,7 +5,12 @@
 
 #include "codegen.h"
 
-Codegen::Codegen(int &argc, char **&argv) : init_(argc, argv) {
+CodeGen::CodeGen(const std::string &module_name,
+                 OptimizationLevel optimization_level)
+    : context_(std::make_unique<llvm::LLVMContext>()),
+      module_(std::make_unique<llvm::Module>(module_name, *context_)),
+      builder_(std::make_unique<llvm::IRBuilder<>>(*context_)) {
+
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   llvm::InitializeNativeTargetAsmParser();
@@ -13,16 +18,18 @@ Codegen::Codegen(int &argc, char **&argv) : init_(argc, argv) {
   std::unique_ptr<llvm::TargetMachine> target_machine(
       llvm::EngineBuilder().selectTarget());
 
-  LLVM_DEBUG(llvm::dbgs() << "Initialized Jit for host target: "
-                          << target_machine->getTargetTriple().normalize()
-                          << "\n\n");
+  jit_ =
+      std::make_unique<JitCompiler>(std::move(target_machine), "/tmp/codegen");
 
-  jit_ = std::make_unique<Jit>(std::move(target_machine), "/tmp/codegen");
-}
-
-std::unique_ptr<CodeContext>
-Codegen::CreateContext(const std::string &module_name,
-                       OptimizationLevel optimization_level) {
-  return std::move(
-      std::make_unique<CodeContext>(module_name, optimization_level));
+  // Commonly used types
+  bool_type_ = llvm::Type::getInt1Ty(*context_);
+  int8_type_ = llvm::Type::getInt8Ty(*context_);
+  int16_type_ = llvm::Type::getInt16Ty(*context_);
+  int32_type_ = llvm::Type::getInt32Ty(*context_);
+  int64_type_ = llvm::Type::getInt64Ty(*context_);
+  double_type_ = llvm::Type::getDoubleTy(*context_);
+  float_type_ = llvm::Type::getFloatTy(*context_);
+  void_type_ = llvm::Type::getVoidTy(*context_);
+  void_ptr_type_ = llvm::Type::getInt8PtrTy(*context_);
+  char_ptr_type_ = llvm::Type::getInt8PtrTy(*context_);
 }

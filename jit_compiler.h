@@ -1,5 +1,5 @@
-#ifndef JIT_H_
-#define JIT_H_
+#ifndef JIT_COMPILER_H_
+#define JIT_COMPILER_H_
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ExecutionEngine/JITEventListener.h>
@@ -21,23 +21,23 @@
 #include <string>
 
 #include "object_cache.h"
-#include "optimization_level.h"
+#include "optimizer.h"
 
-class Jit {
+class JitCompiler {
 public:
-  Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
-      const std::string &cache_dir = "");
+  JitCompiler(std::unique_ptr<llvm::TargetMachine> target_machine,
+              const std::string &cache_dir = "");
 
   // Not a value type.
-  Jit(const Jit &) = delete;
-  Jit &operator=(const Jit &) = delete;
-  Jit(Jit &&) = delete;
-  Jit &operator=(Jit &&) = delete;
+  JitCompiler(const JitCompiler &) = delete;
+  JitCompiler &operator=(const JitCompiler &) = delete;
+  JitCompiler(JitCompiler &&) = delete;
+  JitCompiler &operator=(JitCompiler &&) = delete;
 
   llvm::Error SubmitModule(std::unique_ptr<llvm::Module> module,
                            std::unique_ptr<llvm::LLVMContext> context,
                            OptimizationLevel optimization_level,
-                           bool add_to_cache);
+                           bool add_to_cache = true);
 
   template <class Signature_t>
   llvm::Expected<std::function<Signature_t>> GetFunction(llvm::StringRef name) {
@@ -74,4 +74,4 @@ private:
   llvm::Expected<llvm::JITTargetAddress> GetFunctionAddr(llvm::StringRef name);
 };
 
-#endif /* JIT_H_ */
+#endif /* JIT_COMPILER_H_ */

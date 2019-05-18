@@ -6,11 +6,11 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include "jit.h"
+#include "jit_compiler.h"
 #include "optimizer.h"
 
-Jit::Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
-         const std::string &cache_dir)
+JitCompiler::JitCompiler(std::unique_ptr<llvm::TargetMachine> target_machine,
+                         const std::string &cache_dir)
     : exec_session_(std::make_unique<llvm::orc::ExecutionSession>()),
       target_machine_(std::move(target_machine)),
       obj_cache_(std::make_unique<ObjectCache>(cache_dir)),
@@ -21,12 +21,18 @@ Jit::Jit(std::unique_ptr<llvm::TargetMachine> target_machine,
           *exec_session_, linking_layer_,
           llvm::orc::SimpleCompiler(*this->target_machine_, obj_cache_.get())),
       optimize_layer_(*exec_session_, compile_layer_) {
+
+  LLVM_DEBUG(llvm::dbgs() << "Initialized Jit compiler for host target: "
+                          << target_machine_->getTargetTriple().normalize()
+                          << "\n\n");
+
   if (auto resolver = CreateHostProcessResolver()) {
     exec_session_->getMainJITDylib().setGenerator(std::move(resolver));
   }
 }
 
-llvm::orc::JITDylib::GeneratorFunction Jit::CreateHostProcessResolver() {
+llvm::orc::JITDylib::GeneratorFunction
+JitCompiler::CreateHostProcessResolver() {
   llvm::DataLayout data_layout = target_machine_->createDataLayout();
   llvm::Expected<llvm::orc::JITDylib::GeneratorFunction> resolver =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
@@ -50,20 +56,20 @@ llvm::orc::JITDylib::GeneratorFunction Jit::CreateHostProcessResolver() {
 using GetMemoryManagerFunction =
     llvm::orc::RTDyldObjectLinkingLayer::GetMemoryManagerFunction;
 
-GetMemoryManagerFunction Jit::CreateMemoryManagerFtor() {
+GetMemoryManagerFunction JitCompiler::CreateMemoryManagerFtor() {
   return []() -> GetMemoryManagerFunction::result_type {
     return std::make_unique<llvm::SectionMemoryManager>();
   };
 }
 
 llvm::orc::RTDyldObjectLinkingLayer::NotifyLoadedFunction
-Jit::CreateNotifyLoadedFtor() {
+JitCompiler::CreateNotifyLoadedFtor() {
   return std::bind(&llvm::JITEventListener::notifyObjectLoaded, gdb_listener_,
                    std::placeholders::_1, std::placeholders::_2,
                    std::placeholders::_3);
 }
 
-std::string Jit::Mangle(llvm::StringRef unmangled_name) {
+std::string JitCompiler::Mangle(llvm::StringRef unmangled_name) {
   std::string mangled_name;
   {
     llvm::DataLayout data_layout = target_machine_->createDataLayout();
@@ -74,7 +80,7 @@ std::string Jit::Mangle(llvm::StringRef unmangled_name) {
   return mangled_name;
 }
 
-llvm::Error Jit::ApplyDataLayout(llvm::Module &module) {
+llvm::Error JitCompiler::ApplyDataLayout(llvm::Module &module) {
   llvm::DataLayout data_layout = target_machine_->createDataLayout();
   if (module.getDataLayout().isDefault()) {
     module.setDataLayout(data_layout);
@@ -89,10 +95,11 @@ llvm::Error Jit::ApplyDataLayout(llvm::Module &module) {
   return llvm::Error::success();
 }
 
-llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
-                              std::unique_ptr<llvm::LLVMContext> context,
-                              OptimizationLevel optimization_level,
-                              bool add_to_cache) {
+llvm::Error
+JitCompiler::SubmitModule(std::unique_ptr<llvm::Module> module,
+                          std::unique_ptr<llvm::LLVMContext> context,
+                          OptimizationLevel optimization_level,
+                          bool add_to_cache) {
   if (add_to_cache) {
     obj_cache_->SetCacheModuleName(*module);
   }
@@ -124,7 +131,7 @@ llvm::Error Jit::SubmitModule(std::unique_ptr<llvm::Module> module,
 }
 
 llvm::Expected<llvm::JITTargetAddress>
-Jit::GetFunctionAddr(llvm::StringRef name) {
+JitCompiler::GetFunctionAddr(llvm::StringRef name) {
   llvm::orc::SymbolStringPtr name_ptr = exec_session_->intern(Mangle(name));
   llvm::orc::JITDylibSearchList JDs{{&exec_session_->getMainJITDylib(), true}};
 

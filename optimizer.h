@@ -6,7 +6,7 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
-#include "optimization_level.h"
+enum OptimizationLevel { O0, O1, O2, O3 };
 
 class Optimizer {
 public:

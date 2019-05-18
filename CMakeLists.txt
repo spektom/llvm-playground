@@ -17,7 +17,7 @@ message(STATUS "System: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Arch: ${CMAKE_SYSTEM_PROCESSOR}")
 
 message("")
-message("Looking for LLVM")
+message("LLVM")
 
 if(LLVM_DIR)
   file(TO_CMAKE_PATH ${LLVM_DIR} LLVM_DIR)
@@ -61,11 +61,10 @@ endif()
 
 add_executable(${CMAKE_PROJECT_NAME}
   main.cc
-  jit.cc
   codegen.cc
-  optimizer.cc
+  jit_compiler.cc
   object_cache.cc
-  code_context.cc
+  optimizer.cc
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE

@@ -1,25 +1,37 @@
 #ifndef CODEGEN_H_
 #define CODEGEN_H_
 
-#include <llvm/Support/InitLLVM.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
 #include <memory>
 #include <string>
 
-#include "code_context.h"
-#include "jit.h"
+#include "jit_compiler.h"
 
-class Codegen {
+class CodeGen {
 public:
-  Codegen(int &argc, char **&argv);
-
-  std::unique_ptr<CodeContext>
-  CreateContext(const std::string &module_name,
-                OptimizationLevel optimization_level = OptimizationLevel::O2);
+  CodeGen(const std::string &module_name,
+          OptimizationLevel optimization_level = OptimizationLevel::O2);
 
 private:
-  llvm::InitLLVM init_;
-  std::unique_ptr<Jit> jit_;
+  std::unique_ptr<llvm::LLVMContext> context_;
+  std::unique_ptr<llvm::Module> module_;
+  std::unique_ptr<llvm::IRBuilder<>> builder_;
+  std::unique_ptr<JitCompiler> jit_;
+
+  // Commonly used types:
+  llvm::Type *bool_type_;
+  llvm::Type *int8_type_;
+  llvm::Type *int16_type_;
+  llvm::Type *int32_type_;
+  llvm::Type *int64_type_;
+  llvm::Type *float_type_;
+  llvm::Type *double_type_;
+  llvm::Type *void_type_;
+  llvm::Type *void_ptr_type_;
+  llvm::PointerType *char_ptr_type_;
 };
 
 #endif /* CODEGEN_H_ */
