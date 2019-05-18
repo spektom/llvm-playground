@@ -1,6 +1,9 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
 
 #include "optimizer.h"
 
@@ -11,6 +14,13 @@ operator()(llvm::orc::ThreadSafeModule thread_safe_module,
 
   llvm::legacy::FunctionPassManager func_pass_manager(&module);
   builder_.populateFunctionPassManager(func_pass_manager);
+  // Setup additional passes:
+  func_pass_manager.add(llvm::createInstructionCombiningPass());
+  func_pass_manager.add(llvm::createReassociatePass());
+  func_pass_manager.add(llvm::createGVNPass());
+  func_pass_manager.add(llvm::createCFGSimplificationPass());
+  func_pass_manager.add(llvm::createAggressiveDCEPass());
+  func_pass_manager.add(llvm::createCFGSimplificationPass());
 
   func_pass_manager.doInitialization();
   for (llvm::Function &function : module) {
