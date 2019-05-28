@@ -15,14 +15,15 @@
 #include "macros.h"
 
 class JitCompiler {
-  friend class ModuleBuilder;
-
 public:
   JitCompiler();
   DISALLOW_COPY_AND_MOVE(JitCompiler);
   ~JitCompiler();
 
-  void AddSymbol(std::string const &name, void *address);
+  void AddSymbol(const std::string &, void *);
+  void AddModule(std::unique_ptr<llvm::Module>,
+                 std::unique_ptr<llvm::LLVMContext>);
+  void *FindFunction(const std::string &);
 
 private:
   llvm::Expected<llvm::orc::ThreadSafeModule>
@@ -32,7 +33,6 @@ private:
 private:
   explicit JitCompiler(llvm::orc::JITTargetMachineBuilder);
   llvm::orc::ExecutionSession session_;
-
   llvm::DataLayout data_layout_;
   std::unique_ptr<llvm::TargetMachine> target_machine_;
 

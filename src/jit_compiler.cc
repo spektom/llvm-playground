@@ -38,13 +38,13 @@ JitCompiler::JitCompiler(llvm::orc::JITTargetMachineBuilder tmb)
               data_layout_))) {
 
   session_.getMainJITDylib().setGenerator(
-      [this](llvm::orc::JITDylib &jd, llvm::orc::SymbolNameSet const &Names)
+      [this](llvm::orc::JITDylib &jd, llvm::orc::SymbolNameSet const &names)
           -> llvm::orc::SymbolNameSet {
         auto added = llvm::orc::SymbolNameSet{};
         auto remaining = llvm::orc::SymbolNameSet{};
         auto new_symbols = llvm::orc::SymbolMap{};
 
-        for (auto &name : Names) {
+        for (auto &name : names) {
           auto it = external_symbols_.find(std::string(*name));
           if (it == external_symbols_.end()) {
             remaining.insert(name);
@@ -86,7 +86,6 @@ JitCompiler::~JitCompiler() {
 llvm::Expected<llvm::orc::ThreadSafeModule>
 JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
                             llvm::orc::MaterializationResponsibility const &) {
-
   auto module = tsm.getModule();
   auto target_triple = target_machine_->getTargetTriple();
 
@@ -131,4 +130,19 @@ JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
 
 void JitCompiler::AddSymbol(std::string const &name, void *address) {
   external_symbols_[name] = reinterpret_cast<uintptr_t>(address);
+}
+
+void JitCompiler::AddModule(std::unique_ptr<llvm::Module> module,
+                            std::unique_ptr<llvm::LLVMContext> context) {
+  ThrowOnError(optimize_layer_.add(
+      session_.getMainJITDylib(),
+      llvm::orc::ThreadSafeModule(std::move(module), std::move(context))));
+}
+
+void *JitCompiler::FindFunction(std::string const &name) {
+  llvm::orc::MangleAndInterner mangle(session_, data_layout_);
+  auto address =
+      ThrowOnError(session_.lookup({&session_.getMainJITDylib()}, mangle(name)))
+          .getAddress();
+  return reinterpret_cast<void *>(address);
 }

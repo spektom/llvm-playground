@@ -1,31 +1,36 @@
 #ifndef MODULE_H_
 #define MODULE_H_
 
-#include <llvm/ExecutionEngine/Orc/Core.h>
-#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
+#include "codegen.h"
+#include "debug_info.h"
 #include "macros.h"
-#include "function.h"
 
-class Module {
-  friend class ModuleBuilder;
+class JitCompiler;
 
+class ModuleBuilder {
 public:
-  DISALLOW_COPY_AND_MOVE(Module);
+  ModuleBuilder(JitCompiler &, const std::string &);
+  DISALLOW_COPY_AND_MOVE(ModuleBuilder);
 
-  template <typename ReturnType, typename... Arguments>
-  auto GetAddress(Function<ReturnType, Arguments...> const &fn) {
-    return reinterpret_cast<ReturnType (*)(Arguments...)>(
-        GetAddress(fn.name()));
-  }
+  void Finish();
+
+  llvm::LLVMContext &context() const { return *context_; }
+  llvm::Module &module() const { return *module_; }
+  llvm::IRBuilder<> &ir_builder() { return ir_builder_; }
+  DebugInfo &debug_info() { return debug_info_; }
+  CodeGen &codegen() { return codegen_; }
 
 private:
-  Module(llvm::orc::ExecutionSession &, llvm::DataLayout const &);
-  void *GetAddress(std::string const &);
-
-private:
-  llvm::orc::ExecutionSession *session_;
-  llvm::orc::MangleAndInterner mangle_;
+  JitCompiler &jit_compiler_;
+  std::unique_ptr<llvm::LLVMContext> context_;
+  std::unique_ptr<llvm::Module> module_;
+  llvm::IRBuilder<> ir_builder_;
+  DebugInfo debug_info_;
+  CodeGen codegen_;
 };
 
 #endif /* MODULE_H_ */

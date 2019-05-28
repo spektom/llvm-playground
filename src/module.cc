@@ -1,12 +1,14 @@
-#include "module.h"
 #include "error.h"
+#include "jit_compiler.h"
+#include "module.h"
 
-Module::Module(llvm::orc::ExecutionSession &session, llvm::DataLayout const &dl)
-    : session_(&session), mangle_(session, dl) {}
+ModuleBuilder::ModuleBuilder(JitCompiler &jit_compiler, const std::string &name)
+    : jit_compiler_(jit_compiler),
+      context_(std::make_unique<llvm::LLVMContext>()),
+      module_(std::make_unique<llvm::Module>(name, *context_)),
+      ir_builder_(*context_), debug_info_(*this), codegen_(*this) {}
 
-void *Module::GetAddress(std::string const &name) {
-  auto address = ThrowOnError(session_->lookup({&session_->getMainJITDylib()},
-                                               mangle_(name)))
-                     .getAddress();
-  return reinterpret_cast<void *>(address);
+void ModuleBuilder::Finish() {
+  debug_info_.ExitModule();
+  jit_compiler_.AddModule(std::move(module_), std::move(context_));
 }
