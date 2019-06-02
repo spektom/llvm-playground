@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
+set (CMAKE_CXX_STANDARD 17)
 
 project(llvm-playground
   LANGUAGES CXX
@@ -27,3 +28,4 @@ target_compile_features(${CMAKE_PROJECT_NAME} PUBLIC cxx_std_17)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${CODEGEN_CXX_FLAGS})
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC LLVM c++fs)
+#target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC LLVM stdc++fs)

@@ -9,11 +9,11 @@
 
 #include "error.h"
 #include "jit_compiler.h"
-#include "util.h"
 
 JitCompiler::JitCompiler(llvm::orc::JITTargetMachineBuilder tmb)
-    : data_layout_(ThrowOnError(tmb.getDefaultDataLayoutForTarget())),
-      target_machine_(ThrowOnError(tmb.createTargetMachine())),
+    : target_machine_(ThrowOnError(tmb.createTargetMachine())),
+      data_layout_(ThrowOnError(tmb.getDefaultDataLayoutForTarget())),
+
       object_layer_(
           session_,
           [] { return std::make_unique<llvm::SectionMemoryManager>(); },
@@ -24,18 +24,24 @@ JitCompiler::JitCompiler(llvm::orc::JITTargetMachineBuilder tmb)
             }
             loaded_modules_.emplace_back(vk);
           }),
+
       compile_layer_(session_, object_layer_,
                      llvm::orc::ConcurrentIRCompiler(std::move(tmb))),
+
       optimize_layer_(
           session_, compile_layer_,
           [this](llvm::orc::ThreadSafeModule tsm,
                  llvm::orc::MaterializationResponsibility const &mr) {
             return OptimizeModule(std::move(tsm), mr);
           }),
-      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()),
+
       dynlib_generator_(ThrowOnError(
           llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-              data_layout_))) {
+              data_layout_))),
+
+      gdb_listener_(llvm::JITEventListener::createGDBRegistrationListener()),
+
+      mangle_(session_, data_layout_) {
 
   session_.getMainJITDylib().setGenerator(
       [this](llvm::orc::JITDylib &jd, llvm::orc::SymbolNameSet const &names)
@@ -85,15 +91,13 @@ JitCompiler::~JitCompiler() {
 
 llvm::Expected<llvm::orc::ThreadSafeModule>
 JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
-                            llvm::orc::MaterializationResponsibility const &) {
+                            const llvm::orc::MaterializationResponsibility &) {
   auto module = tsm.getModule();
   auto target_triple = target_machine_->getTargetTriple();
 
-  module->setDataLayout(data_layout_);
-  module->setTargetTriple(target_triple.str());
-
   auto library_info =
       std::make_unique<llvm::TargetLibraryInfoImpl>(target_triple);
+
   auto function_passes = llvm::legacy::FunctionPassManager(module);
   auto module_passes = llvm::legacy::PassManager();
 
@@ -129,20 +133,24 @@ JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
 }
 
 void JitCompiler::AddSymbol(std::string const &name, void *address) {
-  external_symbols_[name] = reinterpret_cast<uintptr_t>(address);
+  external_symbols_[*mangle_(name)] = reinterpret_cast<uintptr_t>(address);
 }
 
 void JitCompiler::AddModule(std::unique_ptr<llvm::Module> module,
                             std::unique_ptr<llvm::LLVMContext> context) {
+
+  auto target_triple = target_machine_->getTargetTriple();
+  module->setDataLayout(data_layout_);
+  module->setTargetTriple(target_triple.str());
+
   ThrowOnError(optimize_layer_.add(
       session_.getMainJITDylib(),
       llvm::orc::ThreadSafeModule(std::move(module), std::move(context))));
 }
 
-void *JitCompiler::FindFunction(std::string const &name) {
-  llvm::orc::MangleAndInterner mangle(session_, data_layout_);
-  auto address =
-      ThrowOnError(session_.lookup({&session_.getMainJITDylib()}, mangle(name)))
-          .getAddress();
+void *JitCompiler::GetFunction(std::string const &name) {
+  auto address = ThrowOnError(session_.lookup({&session_.getMainJITDylib()},
+                                              mangle_(name)))
+                     .getAddress();
   return reinterpret_cast<void *>(address);
 }

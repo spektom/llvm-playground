@@ -8,7 +8,7 @@
 
 class ModuleBuilder;
 
-class FunctionBuilder {
+class FunctionDeclaration {
 public:
   struct Argument {
     std::string name;
@@ -18,20 +18,32 @@ public:
   };
 
 public:
-  FunctionBuilder(ModuleBuilder &, const std::string &, llvm::Type *,
-                  const std::vector<Argument> &);
-  DISALLOW_COPY_AND_MOVE(FunctionBuilder);
+  FunctionDeclaration(ModuleBuilder &, const std::string &, llvm::Type *,
+                      const std::vector<Argument> &);
+  DISALLOW_COPY_AND_MOVE(FunctionDeclaration);
+  ~FunctionDeclaration() {}
 
   llvm::Value *GetArgumentByName(const std::string &);
   llvm::Value *GetArgumentByPosition(uint32_t);
-  void Finish(llvm::Value *);
 
   llvm::Function *function() const { return function_; }
 
 private:
-  ModuleBuilder &mb_;
   std::string name_;
   llvm::Function *function_;
+};
+
+class FunctionBuilder : public FunctionDeclaration {
+public:
+  FunctionBuilder(ModuleBuilder &, const std::string &, llvm::Type *,
+                  const std::vector<Argument> &);
+  DISALLOW_COPY_AND_MOVE(FunctionBuilder);
+  ~FunctionBuilder() {}
+
+  void Finish(llvm::Value *);
+
+private:
+  ModuleBuilder &mb_;
 };
 
 #endif /* FUNCTION_H_ */
