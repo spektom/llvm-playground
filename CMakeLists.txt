@@ -19,11 +19,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
   ${LLVM_INCLUDE_DIR}
 )
 
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/>
-  ${LLVM_INCLUDE_DIR}
-)
-
 target_compile_features(${CMAKE_PROJECT_NAME} PUBLIC cxx_std_17)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${CODEGEN_CXX_FLAGS})
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${CODEGEN_CXX_FLAGS})

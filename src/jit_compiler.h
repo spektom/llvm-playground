@@ -22,7 +22,7 @@ public:
   void AddSymbol(const std::string &, void *);
   void AddModule(std::unique_ptr<llvm::Module>,
                  std::unique_ptr<llvm::LLVMContext>);
-  void *GetFunction(const std::string &);
+  void *GetFuncPtr(const std::string &);
 
 private:
   llvm::Expected<llvm::orc::ThreadSafeModule>

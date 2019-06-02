@@ -7,8 +7,13 @@
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
+#include <chrono>
+#include <iostream>
+
 #include "error.h"
 #include "jit_compiler.h"
+
+namespace cr = std::chrono;
 
 JitCompiler::JitCompiler(llvm::orc::JITTargetMachineBuilder tmb)
     : target_machine_(ThrowOnError(tmb.createTargetMachine())),
@@ -92,6 +97,9 @@ JitCompiler::~JitCompiler() {
 llvm::Expected<llvm::orc::ThreadSafeModule>
 JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
                             const llvm::orc::MaterializationResponsibility &) {
+
+  auto begin = cr::steady_clock::now();
+
   auto module = tsm.getModule();
   auto target_triple = target_machine_->getTargetTriple();
 
@@ -129,6 +137,12 @@ JitCompiler::OptimizeModule(llvm::orc::ThreadSafeModule tsm,
   function_passes.doFinalization();
 
   module_passes.run(*module);
+
+  auto end = cr::steady_clock::now();
+  std::cout << "Module optimization took "
+            << cr::duration_cast<cr::milliseconds>(end - begin).count() << " ms"
+            << std::endl;
+
   return tsm;
 }
 
@@ -148,7 +162,7 @@ void JitCompiler::AddModule(std::unique_ptr<llvm::Module> module,
       llvm::orc::ThreadSafeModule(std::move(module), std::move(context))));
 }
 
-void *JitCompiler::GetFunction(std::string const &name) {
+void *JitCompiler::GetFuncPtr(std::string const &name) {
   auto address = ThrowOnError(session_.lookup({&session_.getMainJITDylib()},
                                               mangle_(name)))
                      .getAddress();

@@ -8,6 +8,7 @@ Playing with LLVM for the purpose of building compile-time optimized Jit.
  * LLVM 8
  * CMake 3.12+
  * GCC 8+ or Clang 8+
+ * Glog 0.4+
 
 ## Compiling
 

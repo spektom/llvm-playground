@@ -8,39 +8,36 @@
 
 class ModuleBuilder;
 
-class FunctionDeclaration {
+class FuncDecl {
 public:
-  struct Argument {
+  struct Arg {
     std::string name;
     llvm::Type *type;
-    Argument(std::string _name, llvm::Type *_type)
-        : name(std::move(_name)), type(_type) {}
+    Arg(const std::string &_name, llvm::Type *_type)
+        : name(_name), type(_type) {}
+
+    Arg(llvm::Type *_type) : Arg("", _type) {}
   };
 
 public:
-  FunctionDeclaration(ModuleBuilder &, const std::string &, llvm::Type *,
-                      const std::vector<Argument> &);
-  DISALLOW_COPY_AND_MOVE(FunctionDeclaration);
-  ~FunctionDeclaration() {}
+  FuncDecl(ModuleBuilder &, const std::string &, llvm::Type *,
+           const std::vector<Arg> &);
+  ~FuncDecl() {}
 
-  llvm::Value *GetArgumentByName(const std::string &);
-  llvm::Value *GetArgumentByPosition(uint32_t);
-
-  llvm::Function *function() const { return function_; }
+  llvm::Value *GetArgByName(const std::string &);
+  llvm::Function *func() const { return func_; }
 
 private:
-  std::string name_;
-  llvm::Function *function_;
+  llvm::Function *func_;
 };
 
-class FunctionBuilder : public FunctionDeclaration {
+class FuncBuilder : public FuncDecl {
 public:
-  FunctionBuilder(ModuleBuilder &, const std::string &, llvm::Type *,
-                  const std::vector<Argument> &);
-  DISALLOW_COPY_AND_MOVE(FunctionBuilder);
-  ~FunctionBuilder() {}
+  FuncBuilder(ModuleBuilder &, const std::string &, llvm::Type *,
+              const std::vector<Arg> &);
+  ~FuncBuilder() {}
 
-  void Finish(llvm::Value *);
+  void Return(llvm::Value *ret_val = nullptr);
 
 private:
   ModuleBuilder &mb_;
