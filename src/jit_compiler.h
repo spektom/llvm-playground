@@ -24,6 +24,8 @@ public:
                  std::unique_ptr<llvm::LLVMContext>);
   void *GetFuncPtr(const std::string &);
 
+  const llvm::DataLayout &data_layout() const { return data_layout_; }
+
 private:
   llvm::Expected<llvm::orc::ThreadSafeModule>
   OptimizeModule(llvm::orc::ThreadSafeModule,

@@ -9,6 +9,7 @@
 #include "function.h"
 #include "macros.h"
 #include "statements.h"
+#include "struct.h"
 #include "types.h"
 
 class JitCompiler;
@@ -21,6 +22,7 @@ public:
   void Build();
   std::string GetIR() const;
 
+  JitCompiler &jit_compiler() const { return jit_compiler_; }
   llvm::LLVMContext &context() const { return *context_; }
   llvm::Module &module() const { return *module_; }
   llvm::IRBuilder<> &ir_builder() { return ir_builder_; }
@@ -28,10 +30,11 @@ public:
   Constants &constants() { return constants_; }
   Statements &statements() { return statements_; }
 
-  FuncBuilder &&CreateFunc(const std::string &, llvm::Type *,
-                           const std::vector<FuncBuilder::Arg> &);
+  FuncBuilder &&GetFunc(const std::string &, llvm::Type *,
+                        const std::vector<FuncBuilder::Arg> &);
   llvm::Function *RegExtFunc(const std::string &, llvm::Type *,
                              const std::vector<FuncBuilder::Arg> &, void *);
+  Struct &&GetStruct(const std::string &, const std::vector<Struct::Member> &);
 
 private:
   JitCompiler &jit_compiler_;

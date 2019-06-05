@@ -17,6 +17,10 @@ public:
   llvm::Constant *Get(int16_t) const;
   llvm::Constant *Get(int32_t) const;
   llvm::Constant *Get(int64_t) const;
+  llvm::Constant *Get(uint8_t) const;
+  llvm::Constant *Get(uint16_t) const;
+  llvm::Constant *Get(uint32_t) const;
+  llvm::Constant *Get(uint64_t) const;
   llvm::Constant *Get(float) const;
   llvm::Constant *Get(double) const;
   llvm::Value *Get(const std::string &) const;

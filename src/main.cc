@@ -17,9 +17,12 @@ int main(int argc, char **argv) {
                            reinterpret_cast<void *>(mul_func));
 
   auto foo =
-      mb.CreateFunc("foo", mb.types().Int32(), {{"arg1", mb.types().Int32()}});
+      mb.GetFunc("foo", mb.types().Int32(), {{"arg1", mb.types().Int32()}});
   auto ret_val = mb.statements().Call(mul, {foo.GetArgByName("arg1")});
   foo.Return(ret_val);
+
+  mb.GetStruct("Person", {{"name", mb.types().
+
   mb.Build();
 
   auto foo_ptr = reinterpret_cast<int32_t (*)(int32_t)>(jc.GetFuncPtr("foo"));

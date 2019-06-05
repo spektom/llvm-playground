@@ -29,6 +29,22 @@ llvm::Constant *Constants::Get(int64_t val) const {
   return llvm::ConstantInt::get(mb_.types().Int64(), val, true);
 }
 
+llvm::Constant *Constants::Get(uint8_t val) const {
+  return llvm::ConstantInt::get(mb_.types().Int8(), val, false);
+}
+
+llvm::Constant *Constants::Get(uint16_t val) const {
+  return llvm::ConstantInt::get(mb_.types().Int16(), val, false);
+}
+
+llvm::Constant *Constants::Get(uint32_t val) const {
+  return llvm::ConstantInt::get(mb_.types().Int32(), val, false);
+}
+
+llvm::Constant *Constants::Get(uint64_t val) const {
+  return llvm::ConstantInt::get(mb_.types().Int64(), val, false);
+}
+
 llvm::Constant *Constants::Get(float val) const {
   return llvm::ConstantFP::get(mb_.types().Float(), val);
 }

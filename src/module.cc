@@ -26,8 +26,8 @@ std::string ModuleBuilder::GetIR() const {
 }
 
 FuncBuilder &&
-ModuleBuilder::CreateFunc(const std::string &name, llvm::Type *ret_type,
-                          const std::vector<FuncBuilder::Arg> &args) {
+ModuleBuilder::GetFunc(const std::string &name, llvm::Type *ret_type,
+                       const std::vector<FuncBuilder::Arg> &args) {
   return std::move(FuncBuilder(*this, name, ret_type, args));
 }
 
@@ -39,4 +39,9 @@ ModuleBuilder::RegExtFunc(const std::string &name, llvm::Type *ret_type,
   FuncDecl decl(*this, name, ret_type, args);
   jit_compiler_.AddSymbol(name, func_ptr);
   return decl.func();
+}
+
+Struct &&ModuleBuilder::GetStruct(const std::string &name,
+                                  const std::vector<Struct::Member> &members) {
+  return std::move(Struct(*this, name, members));
 }
