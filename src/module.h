@@ -11,6 +11,7 @@
 #include "statements.h"
 #include "struct.h"
 #include "types.h"
+#include "vector.h"
 
 class JitCompiler;
 
@@ -21,6 +22,7 @@ public:
 
   void Build();
   std::string GetIR() const;
+  void Verify() const;
 
   JitCompiler &jit_compiler() const { return jit_compiler_; }
   llvm::LLVMContext &context() const { return *context_; }
@@ -34,7 +36,13 @@ public:
                         const std::vector<FuncBuilder::Arg> &);
   llvm::Function *RegExtFunc(const std::string &, llvm::Type *,
                              const std::vector<FuncBuilder::Arg> &, void *);
+
+  Struct &&GetStruct(llvm::Value *, const std::string &,
+                     const std::vector<Struct::Member> &);
   Struct &&GetStruct(const std::string &, const std::vector<Struct::Member> &);
+
+  Vector &&GetVector(llvm::Value *, llvm::Type *element_type, uint32_t size);
+  Vector &&GetVector(llvm::Type *element_type, uint32_t size);
 
 private:
   JitCompiler &jit_compiler_;

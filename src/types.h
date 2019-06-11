@@ -20,8 +20,9 @@ public:
   llvm::Type *Float() const { return float_; }
   llvm::Type *Double() const { return double_; }
   llvm::Type *Void() const { return void_; }
-  llvm::Type *VoidPtr() const { return void_ptr_; }
-  llvm::PointerType *CharPtr() const { return char_ptr_; }
+  llvm::PointerType *VoidPtr() const { return int8_ptr_; }
+  llvm::PointerType *CharPtr() const { return int8_ptr_; }
+  llvm::PointerType *Int8Ptr() const { return int8_ptr_; }
   llvm::Type *Array(llvm::Type *, uint32_t) const;
 
 private:
@@ -35,8 +36,7 @@ private:
   llvm::Type *float_;
   llvm::Type *double_;
   llvm::Type *void_;
-  llvm::Type *void_ptr_;
-  llvm::PointerType *char_ptr_;
+  llvm::PointerType *int8_ptr_;
 };
 
 #endif /* TYPES_H_ */

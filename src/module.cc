@@ -1,3 +1,4 @@
+#include "llvm/IR/Verifier.h"
 #include <llvm/Support/raw_os_ostream.h>
 
 #include <iostream>
@@ -14,7 +15,7 @@ ModuleBuilder::ModuleBuilder(JitCompiler &jit_compiler, const std::string &name)
       statements_(*this) {}
 
 void ModuleBuilder::Build() {
-  std::cout << GetIR();
+  Verify();
   jit_compiler_.AddModule(std::move(module_), std::move(context_));
 }
 
@@ -23,6 +24,15 @@ std::string ModuleBuilder::GetIR() const {
   llvm::raw_string_ostream ostream{module_str};
   module_->print(ostream, nullptr, false);
   return module_str;
+}
+
+void ModuleBuilder::Verify() const {
+  std::string error_str;
+  llvm::raw_string_ostream ostream{error_str};
+  if (llvm::verifyModule(*module_, &ostream)) {
+    std::cout << "ERROR found in IR: " << GetIR() << "\nERROR: " << error_str
+              << "\n\n";
+  }
 }
 
 FuncBuilder &&
@@ -44,4 +54,18 @@ ModuleBuilder::RegExtFunc(const std::string &name, llvm::Type *ret_type,
 Struct &&ModuleBuilder::GetStruct(const std::string &name,
                                   const std::vector<Struct::Member> &members) {
   return std::move(Struct(*this, name, members));
+}
+
+Struct &&ModuleBuilder::GetStruct(llvm::Value *ptr, const std::string &name,
+                                  const std::vector<Struct::Member> &members) {
+  return std::move(Struct(*this, ptr, name, members));
+}
+
+Vector &&ModuleBuilder::GetVector(llvm::Type *element_type, uint32_t size) {
+  return std::move(Vector(*this, element_type, size));
+}
+
+Vector &&ModuleBuilder::GetVector(llvm::Value *ptr, llvm::Type *element_type,
+                                  uint32_t size) {
+  return std::move(Vector(*this, ptr, element_type, size));
 }

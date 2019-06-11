@@ -10,8 +10,7 @@ Types::Types(ModuleBuilder &mb) : mb_(mb) {
   double_ = llvm::Type::getDoubleTy(mb_.context());
   float_ = llvm::Type::getFloatTy(mb_.context());
   void_ = llvm::Type::getVoidTy(mb_.context());
-  void_ptr_ = llvm::Type::getInt8PtrTy(mb_.context());
-  char_ptr_ = llvm::Type::getInt8PtrTy(mb_.context());
+  int8_ptr_ = llvm::Type::getInt8PtrTy(mb_.context());
 }
 
 llvm::Type *Types::Array(llvm::Type *type, uint32_t num_elements) const {
