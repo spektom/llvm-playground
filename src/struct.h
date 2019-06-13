@@ -7,8 +7,6 @@
 
 #include <unordered_map>
 
-#include "macros.h"
-
 class ModuleBuilder;
 
 class Struct {
@@ -24,6 +22,7 @@ public:
   Struct(ModuleBuilder &, const std::string &, const std::vector<Member> &);
   Struct(ModuleBuilder &, llvm::Value *, const std::string &,
          const std::vector<Member> &);
+
   ~Struct() {}
 
   llvm::Value *ptr() { return ptr_; }
@@ -36,10 +35,10 @@ private:
 
 private:
   ModuleBuilder &mb_;
+  llvm::Value *ptr_;
   std::string name_;
   llvm::StructType *struct_type_;
   std::unordered_map<std::string, uint32_t> member_indices_;
-  llvm::Value *ptr_;
 };
 
 #endif /* STRUCT_H_ */

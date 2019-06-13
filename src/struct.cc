@@ -3,7 +3,6 @@
 #include "jit_compiler.h"
 #include "module.h"
 #include "struct.h"
-#include <iostream>
 
 Struct::Struct(ModuleBuilder &mb, const std::string &name,
                const std::vector<Member> &members)
@@ -13,16 +12,14 @@ Struct::Struct(ModuleBuilder &mb, const std::string &name,
 
 Struct::Struct(ModuleBuilder &mb, llvm::Value *ptr, const std::string &name,
                const std::vector<Member> &members)
-    : mb_(mb), name_(name), ptr_(ptr) {
+    : mb_(mb), ptr_(ptr), name_(name) {
 
   std::vector<llvm::Type *> member_types;
-  member_types.reserve(members.size());
   uint32_t idx = 0;
   for (auto &member : members) {
     member_indices_.insert(std::make_pair(member.name, idx++));
     member_types.push_back(member.type);
   }
-
   struct_type_ = llvm::StructType::create(mb_.context(), name);
   struct_type_->setBody(member_types, false /* packed */);
 }

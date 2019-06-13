@@ -11,7 +11,7 @@ Vector::Vector(ModuleBuilder &mb, llvm::Type *element_type, uint32_t size)
 
 Vector::Vector(ModuleBuilder &mb, llvm::Value *ptr, llvm::Type *element_type,
                uint32_t size)
-    : mb_(mb), element_type_(element_type), size_(size), ptr_(ptr) {}
+    : mb_(mb), ptr_(ptr), element_type_(element_type), size_(size) {}
 
 llvm::Value *Vector::Get(uint32_t index) {
   return Get(mb_.constants().Get(index));

@@ -26,9 +26,9 @@ private:
 
 private:
   ModuleBuilder &mb_;
+  llvm::Value *ptr_;
   llvm::Type *element_type_;
   uint32_t size_;
-  llvm::Value *ptr_;
 };
 
 #endif /* VECTOR_H_ */
