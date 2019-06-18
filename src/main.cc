@@ -20,15 +20,21 @@ int main(int argc, char **argv) {
   auto foo =
       mb.GetFunc("foo", mb.types().Int32(), {{"arg1", mb.types().Int32()}});
 
-  auto strct = mb.GetStruct("Abc", {{"f1", mb.types().Int32()}});
-  strct.Set("f1", mb.constants().Get((uint32_t)5));
+  auto strct =
+      mb.GetStruct("Abc", {{"f1", mb.types().Array(mb.types().Int32(), 100)}});
 
-  auto vec = mb.GetVector(mb.types().Int32(), 15);
-  vec.Set(10, mb.constants().Get((uint32_t)5));
+  auto arr = mb.GetArray(strct.GetPtr("f1"));
 
-  foo.Return(mb.statements().Call(mul, {strct.Get("f1"), vec.Get(10)}));
+  arr.Set(50, mb.constants().Get((uint32_t)5));
+  arr.Set(51, mb.constants().Get((uint32_t)3));
+
+  auto arr2 = mb.GetArray(mb.types().Int32(), 200);
+  arr2.Set(100, foo.GetArgByName("arg1"));
+
+  foo.Return(mb.statements().Call(mul, {arr.Get(50), arr.Get(51)}));
+  std::cout << mb.GetIR() << std::endl;
   mb.Build();
 
   auto foo_ptr = reinterpret_cast<int32_t (*)(int32_t)>(jc.GetFuncPtr("foo"));
-  std::cout << std::to_string(foo_ptr(88)) << std::endl;
+  std::cout << std::to_string(foo_ptr(10)) << std::endl;
 }

@@ -65,7 +65,14 @@ Vector &&ModuleBuilder::GetVector(llvm::Type *element_type, uint32_t size) {
   return std::move(Vector(*this, element_type, size));
 }
 
-Vector &&ModuleBuilder::GetVector(llvm::Value *ptr, llvm::Type *element_type,
-                                  uint32_t size) {
-  return std::move(Vector(*this, ptr, element_type, size));
+Vector &&ModuleBuilder::GetVector(llvm::Value *ptr) {
+  return std::move(Vector(*this, ptr));
+}
+
+Array &&ModuleBuilder::GetArray(llvm::Type *element_type, uint32_t size) {
+  return std::move(Array(*this, element_type, size));
+}
+
+Array &&ModuleBuilder::GetArray(llvm::Value *ptr) {
+  return std::move(Array(*this, ptr));
 }

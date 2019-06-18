@@ -27,6 +27,7 @@ public:
 
   llvm::Value *ptr() { return ptr_; }
 
+  llvm::Value *GetPtr(const std::string &);
   llvm::Value *Get(const std::string &);
   void Set(const std::string &, llvm::Value *);
 

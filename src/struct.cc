@@ -3,6 +3,7 @@
 #include "jit_compiler.h"
 #include "module.h"
 #include "struct.h"
+#include <iostream>
 
 Struct::Struct(ModuleBuilder &mb, const std::string &name,
                const std::vector<Member> &members)
@@ -24,16 +25,16 @@ Struct::Struct(ModuleBuilder &mb, llvm::Value *ptr, const std::string &name,
   struct_type_->setBody(member_types, false /* packed */);
 }
 
+llvm::Value *Struct::GetPtr(const std::string &member) {
+  return mb_.ir_builder().CreateStructGEP(ptr_, member_indices_[member]);
+}
+
 llvm::Value *Struct::Get(const std::string &member) {
-  auto member_ptr =
-      mb_.ir_builder().CreateStructGEP(ptr_, member_indices_[member]);
-  return mb_.ir_builder().CreateLoad(member_ptr);
+  return mb_.ir_builder().CreateLoad(GetPtr(member));
 }
 
 void Struct::Set(const std::string &member, llvm::Value *value) {
-  auto member_ptr =
-      mb_.ir_builder().CreateStructGEP(ptr_, member_indices_[member]);
-  mb_.ir_builder().CreateStore(value, member_ptr);
+  mb_.ir_builder().CreateStore(value, GetPtr(member));
 }
 
 void Struct::Allocate() {

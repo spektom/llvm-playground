@@ -1,5 +1,5 @@
-#ifndef VECTOR_H_
-#define VECTOR_H_
+#ifndef ARRAY_H_
+#define ARRAY_H_
 
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -8,12 +8,12 @@
 
 class ModuleBuilder;
 
-// Dynamically allocated array
-class Vector {
+// Statically sized array
+class Array {
 public:
-  Vector(ModuleBuilder &, llvm::Type *, uint32_t);
-  Vector(ModuleBuilder &, llvm::Value *);
-  ~Vector() {}
+  Array(ModuleBuilder &, llvm::Type *, uint32_t);
+  Array(ModuleBuilder &, llvm::Value *);
+  ~Array() {}
 
   llvm::Value *ptr() const { return ptr_; }
 
@@ -34,4 +34,4 @@ private:
   uint32_t size_;
 };
 
-#endif /* VECTOR_H_ */
+#endif /* ARRAY_H_ */

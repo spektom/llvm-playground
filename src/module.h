@@ -12,6 +12,7 @@
 #include "struct.h"
 #include "types.h"
 #include "vector.h"
+#include "array.h"
 
 class JitCompiler;
 
@@ -41,8 +42,11 @@ public:
                      const std::vector<Struct::Member> &);
   Struct &&GetStruct(const std::string &, const std::vector<Struct::Member> &);
 
-  Vector &&GetVector(llvm::Value *, llvm::Type *element_type, uint32_t size);
+  Vector &&GetVector(llvm::Value *);
   Vector &&GetVector(llvm::Type *element_type, uint32_t size);
+
+  Array &&GetArray(llvm::Value *);
+  Array &&GetArray(llvm::Type *element_type, uint32_t size);
 
 private:
   JitCompiler &jit_compiler_;

@@ -5,21 +5,27 @@
 #include "vector.h"
 
 Vector::Vector(ModuleBuilder &mb, llvm::Type *element_type, uint32_t size)
-    : Vector(mb, nullptr, element_type, size) {
+    : mb_(mb), ptr_(nullptr), element_type_(element_type), size_(size) {
   Allocate();
 }
 
-Vector::Vector(ModuleBuilder &mb, llvm::Value *ptr, llvm::Type *element_type,
-               uint32_t size)
-    : mb_(mb), ptr_(ptr), element_type_(element_type), size_(size) {}
+Vector::Vector(ModuleBuilder &mb, llvm::Value *ptr)
+    : mb_(mb), ptr_(ptr), element_type_(nullptr) {}
 
 llvm::Value *Vector::Get(uint32_t index) {
   return Get(mb_.constants().Get(index));
 }
 
+llvm::Value *Vector::GetPtr(uint32_t index) {
+  return GetPtr(mb_.constants().Get(index));
+}
+
+llvm::Value *Vector::GetPtr(llvm::Value *index) {
+  return mb_.ir_builder().CreateInBoundsGEP(ptr_, index);
+}
+
 llvm::Value *Vector::Get(llvm::Value *index) {
-  auto element_ptr = mb_.ir_builder().CreateInBoundsGEP(ptr_, index);
-  return mb_.ir_builder().CreateLoad(element_ptr);
+  return mb_.ir_builder().CreateLoad(GetPtr(index));
 }
 
 void Vector::Set(uint32_t index, llvm::Value *value) {
@@ -27,8 +33,7 @@ void Vector::Set(uint32_t index, llvm::Value *value) {
 }
 
 void Vector::Set(llvm::Value *index, llvm::Value *value) {
-  auto element_ptr = mb_.ir_builder().CreateInBoundsGEP(ptr_, index);
-  mb_.ir_builder().CreateStore(value, element_ptr);
+  mb_.ir_builder().CreateStore(value, GetPtr(index));
 }
 
 void Vector::Allocate() {
